@@ -3,11 +3,11 @@
 const utils = require('@iobroker/adapter-core');
 const axios = require('axios').default;
 const https = require('https');
-const giraTypes = require(__dirname + '/lib/gira-types');
+const giraTypes = require(`${__dirname}/lib/gira-types`);
 
 class GiraIot extends utils.Adapter {
     /**
-     * @param {Partial<utils.AdapterOptions>} [options={}]
+     * @param {Partial<utils.AdapterOptions>} [options]
      */
     constructor(options) {
         super({
@@ -39,7 +39,9 @@ class GiraIot extends utils.Adapter {
         }
 
         if (!this.config.userName || !this.config.userPassword) {
-            this.log.error(`User name and/or user password empty - please check instance configuration of ${this.namespace}`);
+            this.log.error(
+                `User name and/or user password empty - please check instance configuration of ${this.namespace}`,
+            );
             return;
         }
 
@@ -48,7 +50,9 @@ class GiraIot extends utils.Adapter {
             return;
         }
 
-        this.log.info(`Configured server: "${this.config.serverIp}:${this.config.serverPort}" - Connecting with user: "${this.config.userName}"`);
+        this.log.info(
+            `Configured server: "${this.config.serverIp}:${this.config.serverPort}" - Connecting with user: "${this.config.userName}"`,
+        );
         await this.setApiConnection(false);
         await this.setStateChangedAsync('info.callbacksRegistered', { val: false, ack: true });
 
@@ -60,7 +64,7 @@ class GiraIot extends utils.Adapter {
             httpsAgent: new https.Agent({
                 rejectUnauthorized: false,
             }),
-            validateStatus: (status) => {
+            validateStatus: status => {
                 return [200, 201, 401].includes(status);
             },
         });
@@ -76,7 +80,9 @@ class GiraIot extends utils.Adapter {
         try {
             if (this.giraApiClient) {
                 const deviceInfoResponse = await this.giraApiClient.get('/v2/');
-                this.log.debug(`deviceInfoResponse ${deviceInfoResponse.status}: ${JSON.stringify(deviceInfoResponse.data)}`);
+                this.log.debug(
+                    `deviceInfoResponse ${deviceInfoResponse.status}: ${JSON.stringify(deviceInfoResponse.data)}`,
+                );
 
                 if (deviceInfoResponse.status === 200) {
                     const deviceInfo = deviceInfoResponse.data;
@@ -105,7 +111,9 @@ class GiraIot extends utils.Adapter {
                                 },
                             },
                         );
-                        this.log.debug(`registerClientResponse ${registerClientResponse.status}: ${JSON.stringify(registerClientResponse.data)}`);
+                        this.log.debug(
+                            `registerClientResponse ${registerClientResponse.status}: ${JSON.stringify(registerClientResponse.data)}`,
+                        );
 
                         /*
                             200 Created (Home Server - not documented?!)
@@ -126,7 +134,9 @@ class GiraIot extends utils.Adapter {
                                 await this.setApiConnection(true);
                             }
                         } else {
-                            this.log.error(`Unable to register client. Device responded with code ${registerClientResponse.status}`);
+                            this.log.error(
+                                `Unable to register client. Device responded with code ${registerClientResponse.status}`,
+                            );
 
                             await this.setStateAsync('client.token', { val: null, ack: true });
 
@@ -142,13 +152,17 @@ class GiraIot extends utils.Adapter {
 
                     if (this.apiConnected) {
                         const uiConfigIdResponse = await this.giraApiClient.get(`/uiconfig/uid?token=${clientToken}`);
-                        this.log.debug(`uiConfigIdResponse ${uiConfigIdResponse.status}: ${JSON.stringify(uiConfigIdResponse.data)}`);
+                        this.log.debug(
+                            `uiConfigIdResponse ${uiConfigIdResponse.status}: ${JSON.stringify(uiConfigIdResponse.data)}`,
+                        );
 
                         if (uiConfigIdResponse.status === 200) {
                             if (uiConfigIdResponse?.data?.uid) {
                                 if (uiConfigIdResponse.data.uid !== this.uiConfigId) {
                                     if (this.uiConfigId) {
-                                        this.log.info(`UI config ID changed from "${this.uiConfigId}" to "${uiConfigIdResponse.data.uid}" - refreshing functions`);
+                                        this.log.info(
+                                            `UI config ID changed from "${this.uiConfigId}" to "${uiConfigIdResponse.data.uid}" - refreshing functions`,
+                                        );
                                     }
 
                                     await this.refreshDevices();
@@ -156,7 +170,9 @@ class GiraIot extends utils.Adapter {
                                 }
                             }
                         } else if (uiConfigIdResponse.status === 401) {
-                            this.log.warn(`Unable to get UI config ID - looks like your client token is invalid. Will be deleted and recreated automatically`);
+                            this.log.warn(
+                                `Unable to get UI config ID - looks like your client token is invalid. Will be deleted and recreated automatically`,
+                            );
                             await this.setStateAsync('client.token', { val: null, ack: true });
 
                             nextRefreshSec = 2; // Call refresh function again to create a new token
@@ -171,7 +187,9 @@ class GiraIot extends utils.Adapter {
             await this.setApiConnection(false);
 
             if (err.name === 'AxiosError') {
-                this.log.error(`Request to ${err?.config?.url} failed with code ${err?.status} (${err?.code}): ${err.message}`);
+                this.log.error(
+                    `Request to ${err?.config?.url} failed with code ${err?.status} (${err?.code}): ${err.message}`,
+                );
                 this.log.debug(`Complete error object: ${JSON.stringify(err)}`);
             } else {
                 this.log.error(err);
@@ -193,14 +211,16 @@ class GiraIot extends utils.Adapter {
     async refreshDevices() {
         if (this.apiConnected && this.giraApiClient) {
             const clientToken = await this.getClientToken();
-            const uiConfigResponse = await this.giraApiClient.get(`/uiconfig?expand=locations,trades&token=${clientToken}`);
+            const uiConfigResponse = await this.giraApiClient.get(
+                `/uiconfig?expand=locations,trades&token=${clientToken}`,
+            );
             this.log.debug(`uiConfigResponse ${uiConfigResponse.status}: ${JSON.stringify(uiConfigResponse.data)}`);
 
             if (uiConfigResponse.status === 200) {
                 let functionCount = 0;
                 let stateCount = 0;
                 const keepFunctions = [];
-                const allFunctions = (await this.getChannelsOfAsync('functions')).map((obj) => {
+                const allFunctions = (await this.getChannelsOfAsync('functions')).map(obj => {
                     return this.removeNamespace(obj._id);
                 });
 
@@ -246,8 +266,12 @@ class GiraIot extends utils.Adapter {
                             if (giraTypes.channels[func.channelType][dp.name].common.read) {
                                 try {
                                     // Try to get current value
-                                    const getValueResponse = await this.giraApiClient.get(`/values/${dp.uid}?token=${clientToken}`);
-                                    this.log.debug(`getValueResponse ${getValueResponse.status}: ${JSON.stringify(getValueResponse.data)}`);
+                                    const getValueResponse = await this.giraApiClient.get(
+                                        `/values/${dp.uid}?token=${clientToken}`,
+                                    );
+                                    this.log.debug(
+                                        `getValueResponse ${getValueResponse.status}: ${JSON.stringify(getValueResponse.data)}`,
+                                    );
 
                                     if (getValueResponse.status === 200) {
                                         for (const value of getValueResponse.data.values) {
@@ -257,15 +281,23 @@ class GiraIot extends utils.Adapter {
                                                 giraTypes.channels[func.channelType][dp.name].type,
                                             );
 
-                                            await this.setStateChangedAsync(stateObjId, { val: newValue, ack: true, c: 'Init value' });
+                                            await this.setStateChangedAsync(stateObjId, {
+                                                val: newValue,
+                                                ack: true,
+                                                c: 'Init value',
+                                            });
                                         }
                                     }
                                 } catch (err) {
-                                    this.log.error(`unable to get current value for "${stateObjId}" / UID "${dp.uid}" - failed with ${err}`);
+                                    this.log.error(
+                                        `unable to get current value for "${stateObjId}" / UID "${dp.uid}" - failed with ${err}`,
+                                    );
                                 }
                             }
                         } else {
-                            this.log.warn(`Data point "${dp.name}" of channel type "${func.channelType}" is missing in ioBroker description`);
+                            this.log.warn(
+                                `Data point "${dp.name}" of channel type "${func.channelType}" is missing in ioBroker description`,
+                            );
                         }
                     }
                 }
@@ -317,7 +349,9 @@ class GiraIot extends utils.Adapter {
                         }
                     }
                 } else {
-                    this.log.warn(`[createRooms] Found room with empty name: "${location.displayName}" was converted to "enum.rooms.${enumId}"`);
+                    this.log.warn(
+                        `[createRooms] Found room with empty name: "${location.displayName}" was converted to "enum.rooms.${enumId}"`,
+                    );
                 }
             }
 
@@ -349,7 +383,9 @@ class GiraIot extends utils.Adapter {
                         await this.addChannelToEnumAsync('functions', enumId, 'functions', func);
                     }
                 } else {
-                    this.log.warn(`[createFunctions] Found function with empty name: "${trade.tradeType}" was converted to "enum.functions.${enumId}"`);
+                    this.log.warn(
+                        `[createFunctions] Found function with empty name: "${trade.tradeType}" was converted to "enum.functions.${enumId}"`,
+                    );
                 }
             }
         }
@@ -363,7 +399,9 @@ class GiraIot extends utils.Adapter {
             if (stateObj?.type === 'state' && stateObj?.native?.eventing) {
                 const newValue = giraTypes.convertValueForState(value, stateObj.common.type, stateObj.native.type);
 
-                this.log.debug(`Received value event for state "${this.uidCache[uid]}" / UID "${uid}": ${value} (${typeof value}) was converted to ${newValue} (${typeof newValue})`);
+                this.log.debug(
+                    `Received value event for state "${this.uidCache[uid]}" / UID "${uid}": ${value} (${typeof value}) was converted to ${newValue} (${typeof newValue})`,
+                );
                 await this.setStateChangedAsync(this.uidCache[uid], { val: newValue, ack: true, c: 'Value callback' });
             } else {
                 this.log.warn(`Received value event for invalid state with UID "${uid}": ${value}`);
@@ -385,24 +423,36 @@ class GiraIot extends utils.Adapter {
 
                 try {
                     const clientToken = await this.getClientToken();
-                    const registerCallbacksReponse = await this.giraApiClient.post(`/clients/${clientToken}/callbacks`, {
-                        serviceCallback: serviceCallbackUri,
-                        valueCallback: valueCallbackUri,
-                        testCallbacks: false,
-                    });
-                    this.log.debug(`registerCallbacksReponse ${registerCallbacksReponse.status}: ${JSON.stringify(registerCallbacksReponse.data)}`);
+                    const registerCallbacksReponse = await this.giraApiClient.post(
+                        `/clients/${clientToken}/callbacks`,
+                        {
+                            serviceCallback: serviceCallbackUri,
+                            valueCallback: valueCallbackUri,
+                            testCallbacks: false,
+                        },
+                    );
+                    this.log.debug(
+                        `registerCallbacksReponse ${registerCallbacksReponse.status}: ${JSON.stringify(registerCallbacksReponse.data)}`,
+                    );
 
                     if (registerCallbacksReponse.status == 200) {
-                        this.log.info(`Registered callback urls to ${serviceCallbackUri} and ${valueCallbackUri} (web extension)`);
+                        this.log.info(
+                            `Registered callback urls to ${serviceCallbackUri} and ${valueCallbackUri} (web extension)`,
+                        );
 
                         this.webHooksRegistered = true;
-                        await this.setStateAsync('info.callbacksRegistered', { val: this.webHooksRegistered, ack: true });
+                        await this.setStateAsync('info.callbacksRegistered', {
+                            val: this.webHooksRegistered,
+                            ack: true,
+                        });
                     }
                 } catch (err) {
                     this.log.error(`registerCallbacks failed with ${err}`);
                 }
             } else {
-                this.log.debug(`Unable to register callbacks - webHooksRegistered: ${this.webHooksRegistered}, webHooksBaseUrl: ${this.webHooksBaseUrl}`);
+                this.log.debug(
+                    `Unable to register callbacks - webHooksRegistered: ${this.webHooksRegistered}, webHooksBaseUrl: ${this.webHooksBaseUrl}`,
+                );
             }
         } else {
             this.log.debug(`Unable to register callbacks - API not connected`);
@@ -416,21 +466,31 @@ class GiraIot extends utils.Adapter {
 
                 try {
                     const clientToken = await this.getClientToken();
-                    const unregisterCallbacksReponse = await this.giraApiClient.delete(`/clients/${clientToken}/callbacks`);
-                    this.log.debug(`unregisterCallbacksReponse ${unregisterCallbacksReponse.status}: ${JSON.stringify(unregisterCallbacksReponse.data)}`);
+                    const unregisterCallbacksReponse = await this.giraApiClient.delete(
+                        `/clients/${clientToken}/callbacks`,
+                    );
+                    this.log.debug(
+                        `unregisterCallbacksReponse ${unregisterCallbacksReponse.status}: ${JSON.stringify(unregisterCallbacksReponse.data)}`,
+                    );
 
                     if (unregisterCallbacksReponse.status === 200) {
                         this.log.info(`Unregistered callback urls to ${this.webHooksBaseUrl} (web extension)`);
 
                         this.webHooksBaseUrl = null;
                         this.webHooksRegistered = false;
-                        await this.setStateAsync('info.callbacksRegistered', { val: this.webHooksRegistered, ack: true, c: this.webHooksBaseUrl });
+                        await this.setStateAsync('info.callbacksRegistered', {
+                            val: this.webHooksRegistered,
+                            ack: true,
+                            c: this.webHooksBaseUrl,
+                        });
                     }
                 } catch (err) {
                     this.log.error(`unregisterCallbacks failed with ${err}`);
                 }
             } else {
-                this.log.debug(`Unable to unregister callbacks - webHooksRegistered: ${this.webHooksRegistered}, webHooksBaseUrl: ${this.webHooksBaseUrl}`);
+                this.log.debug(
+                    `Unable to unregister callbacks - webHooksRegistered: ${this.webHooksRegistered}, webHooksBaseUrl: ${this.webHooksBaseUrl}`,
+                );
             }
         } else {
             this.log.debug(`Unable to unregister callbacks - API not connected`);
@@ -466,7 +526,7 @@ class GiraIot extends utils.Adapter {
     }
 
     removeNamespace(id) {
-        const re = new RegExp(this.namespace + '*\\.', 'g');
+        const re = new RegExp(`${this.namespace}*\\.`, 'g');
         return id.replace(re, '');
     }
 
@@ -489,20 +549,29 @@ class GiraIot extends utils.Adapter {
                         if (uid && clientToken && this.apiConnected && this.giraApiClient) {
                             const newValue = giraTypes.convertValueForGira(state.val, stateObj.common.type);
 
-                            this.log.debug(`Sending new value for state "${idNoNamespace}" / UID "${uid}": ${state.val} (${typeof state.val}) was converted to ${newValue} (${typeof newValue})`);
+                            this.log.debug(
+                                `Sending new value for state "${idNoNamespace}" / UID "${uid}": ${state.val} (${typeof state.val}) was converted to ${newValue} (${typeof newValue})`,
+                            );
 
                             try {
-                                const putValueResponse = await this.giraApiClient.put(`/values/${uid}?token=${clientToken}`, {
-                                    value: newValue,
-                                });
-                                this.log.debug(`putValueResponse ${putValueResponse.status}: ${JSON.stringify(putValueResponse.data)}`);
+                                const putValueResponse = await this.giraApiClient.put(
+                                    `/values/${uid}?token=${clientToken}`,
+                                    {
+                                        value: newValue,
+                                    },
+                                );
+                                this.log.debug(
+                                    `putValueResponse ${putValueResponse.status}: ${JSON.stringify(putValueResponse.data)}`,
+                                );
 
                                 if (putValueResponse.status === 200) {
                                     // Confirm new value (if sent)
                                     await this.setStateAsync(idNoNamespace, { val: state.val, ack: true });
                                 }
                             } catch (err) {
-                                this.log.error(`Unable to update value of "${idNoNamespace}" / UID "${uid}" - failed with ${err}`);
+                                this.log.error(
+                                    `Unable to update value of "${idNoNamespace}" / UID "${uid}" - failed with ${err}`,
+                                );
                             }
                         }
                     }
@@ -524,7 +593,9 @@ class GiraIot extends utils.Adapter {
                 const newWebHooksBaseUrl = obj.message.baseUrl;
 
                 if (newWebHooksBaseUrl !== this.webHooksBaseUrl) {
-                    this.log.debug(`[onMessage] Received new webHooksBaseUrl: ${newWebHooksBaseUrl} - register callbacks now`);
+                    this.log.debug(
+                        `[onMessage] Received new webHooksBaseUrl: ${newWebHooksBaseUrl} - register callbacks now`,
+                    );
 
                     await this.unregisterCallbacks();
                     await this.registerCallbacks(newWebHooksBaseUrl);
@@ -533,33 +604,60 @@ class GiraIot extends utils.Adapter {
                 await this.unregisterCallbacks();
             } else if (obj.command === 'getWebUrl' && typeof obj.message === 'object') {
                 if (obj.message?.webInstance) {
-                    this.log.debug(`[onMessage] Try to get instance configuration of system.adapter.${obj.message.webInstance}`);
+                    this.log.debug(
+                        `[onMessage] Try to get instance configuration of system.adapter.${obj.message.webInstance}`,
+                    );
 
                     this.getForeignObjectAsync(`system.adapter.${obj.message.webInstance}`)
-                        .then((webObj) => {
+                        .then(webObj => {
                             const isSecure = webObj?.native?.secure;
                             const protocol = isSecure ? 'https' : 'http';
                             const port = webObj?.native?.port;
                             const bind = webObj?.native?.bind;
 
                             if (!isSecure) {
-                                this.sendTo(obj.from, obj.command, `Error: https (secure mode) is required in ${obj.message.webInstance}`, obj.callback);
+                                this.sendTo(
+                                    obj.from,
+                                    obj.command,
+                                    `Error: https (secure mode) is required in ${obj.message.webInstance}`,
+                                    obj.callback,
+                                );
                             } else if (bind && bind.includes('0.0.0.0')) {
-                                this.sendTo(obj.from, obj.command, `Error: Configure specific interface in ${obj.message.webInstance} (or use manual mode)`, obj.callback);
+                                this.sendTo(
+                                    obj.from,
+                                    obj.command,
+                                    `Error: Configure specific interface in ${obj.message.webInstance} (or use manual mode)`,
+                                    obj.callback,
+                                );
                             } else {
                                 if (obj.message?.webCustomUrlActive) {
                                     const customWebUrl = obj.message?.webCustomUrl;
                                     if (customWebUrl) {
-                                        this.sendTo(obj.from, obj.command, `${protocol}://${customWebUrl}:${port}/${this.namespace}/`, obj.callback);
+                                        this.sendTo(
+                                            obj.from,
+                                            obj.command,
+                                            `${protocol}://${customWebUrl}:${port}/${this.namespace}/`,
+                                            obj.callback,
+                                        );
                                     } else {
-                                        this.sendTo(obj.from, obj.command, `Error: Custom web url is not defined`, obj.callback);
+                                        this.sendTo(
+                                            obj.from,
+                                            obj.command,
+                                            `Error: Custom web url is not defined`,
+                                            obj.callback,
+                                        );
                                     }
                                 } else {
-                                    this.sendTo(obj.from, obj.command, `${protocol}://${bind}:${port}/${this.namespace}/`, obj.callback);
+                                    this.sendTo(
+                                        obj.from,
+                                        obj.command,
+                                        `${protocol}://${bind}:${port}/${this.namespace}/`,
+                                        obj.callback,
+                                    );
                                 }
                             }
                         })
-                        .catch((err) => {
+                        .catch(err => {
                             this.sendTo(obj.from, obj.command, `Error: ${err}`, obj.callback);
                         });
                 } else {
@@ -571,6 +669,7 @@ class GiraIot extends utils.Adapter {
 
     /**
      * Is called when adapter shuts down - callback has to be called under any circumstances!
+     *
      * @param {() => void} callback
      */
     onUnload(callback) {
@@ -595,9 +694,9 @@ class GiraIot extends utils.Adapter {
 if (require.main !== module) {
     // Export the constructor in compact mode
     /**
-     * @param {Partial<utils.AdapterOptions>} [options={}]
+     * @param {Partial<utils.AdapterOptions>} [options]
      */
-    module.exports = (options) => new GiraIot(options);
+    module.exports = options => new GiraIot(options);
 } else {
     // otherwise start the instance directly
     new GiraIot();
